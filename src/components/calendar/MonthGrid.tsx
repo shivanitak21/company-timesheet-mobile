@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { useState } from 'react'
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { AppText, Badge, Card } from '@/components/ui/primitives'
 import { ENTRY_WINDOW_LABEL, formatHours, monthLabel, statusLabel } from '@/lib/format'
@@ -8,6 +9,9 @@ import { useTheme } from '@/theme/ThemeProvider'
 import type { CalendarDay, MonthCalendar } from '@/types/api'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const COLUMNS = 7
+const GAP = 4
+const CELL_HEIGHT = 62
 
 export function MonthGrid({
   year,
@@ -23,8 +27,10 @@ export function MonthGrid({
   onSelect: (day: CalendarDay) => void
 }) {
   const { colors } = useTheme()
-  const { width } = useWindowDimensions()
-  const cell = Math.floor((width - 64) / 7) - 2
+  const { width: windowWidth } = useWindowDimensions()
+  const [gridWidth, setGridWidth] = useState(0)
+  const available = gridWidth || Math.max(windowWidth - 80, 280)
+  const cellWidth = Math.floor((available - GAP * (COLUMNS - 1)) / COLUMNS)
   const lead = data?.days[0] ? (data.days[0].weekday + 6) % 7 : 0
   const status = data?.timesheet?.status ?? null
 
@@ -51,78 +57,101 @@ export function MonthGrid({
         </Pressable>
         <AppText variant="muted" style={{ marginLeft: 8 }}>{formatHours(data?.monthlyTotalMinutes ?? 0)}h logged</AppText>
       </View>
-      <View style={styles.weekdays}>
-        {WEEKDAYS.map((day) => (
-          <AppText key={day} variant="eyebrow" style={[styles.weekday, { width: cell, color: colors.muted }]}>
-            {day}
-          </AppText>
-        ))}
-      </View>
-      <View style={styles.grid}>
-        {Array.from({ length: lead }).map((_, index) => (
-          <View key={`pad-${index}`} style={{ width: cell, height: cell + 8 }} />
-        ))}
-        {data?.days.map((day) => {
-          const isToday = data.entryWindow.today === day.date
-          const isYesterday = data.entryWindow.yesterday === day.date
-          const older = day.lockReasons.includes('entry_window') && !day.isFuture
-          const editable = day.isFillable
-          const background = day.isHoliday
-            ? colors.holidaySoft
-            : day.isOnLeave
-              ? colors.infoSoft
-              : editable && isYesterday
-                ? colors.accentSoft
-                : day.isWeekend || older
-                  ? colors.canvas
-                  : editable
-                    ? colors.card
-                    : colors.canvas
-          const note = day.isHoliday
-            ? 'Holiday'
-            : day.isOnLeave
-              ? 'Leave'
-              : day.isWeekend
-                ? 'Weekend'
-                : day.isFuture
-                  ? 'Future'
-                  : older
-                    ? 'Locked'
+      <View
+        onLayout={(event) => {
+          const next = Math.floor(event.nativeEvent.layout.width)
+          setGridWidth((current) => (current === next ? current : next))
+        }}
+      >
+        <View style={styles.weekdays}>
+          {WEEKDAYS.map((day) => (
+            <AppText key={day} variant="eyebrow" style={[styles.weekday, { width: cellWidth, color: colors.muted }]}>
+              {day}
+            </AppText>
+          ))}
+        </View>
+        <View style={styles.grid}>
+          {Array.from({ length: lead }).map((_, index) => (
+            <View key={`pad-${index}`} style={{ width: cellWidth, height: CELL_HEIGHT }} />
+          ))}
+          {data?.days.map((day) => {
+            const isToday = data.entryWindow.today === day.date
+            const isYesterday = data.entryWindow.yesterday === day.date
+            const older = day.lockReasons.includes('entry_window') && !day.isFuture
+            const editable = day.isFillable
+            const background = day.isHoliday
+              ? colors.holidaySoft
+              : day.isOnLeave
+                ? colors.infoSoft
+                : editable && isYesterday
+                  ? colors.accentSoft
+                  : day.isWeekend || older
+                    ? colors.canvas
                     : editable
-                      ? day.entryCount > 0
-                        ? 'Edit'
-                        : 'Add'
-                      : null
-          return (
-            <Pressable
-              key={day.date}
-              accessibilityState={{ disabled: !editable }}
-              accessibilityLabel={day.date}
-              onPress={() => onSelect(day)}
-              style={[
-                styles.cell,
-                {
-                  width: cell,
-                  height: cell + 14,
-                  backgroundColor: isToday ? colors.accentSoft : background,
-                  borderColor: isToday || (editable && isYesterday) ? colors.accent : colors.line,
-                  borderWidth: isToday ? 2 : 1,
-                  opacity: day.isFuture ? 0.4 : !editable && !isToday ? 0.72 : 1,
-                },
-              ]}
-            >
-              <AppText variant="label" style={{ fontSize: 13, color: isToday ? colors.accent : colors.ink }}>{Number(day.date.slice(8))}</AppText>
-              {isToday ? <AppText style={[styles.micro, { color: colors.accent }]}>Today</AppText> : null}
-              {isYesterday && editable ? <AppText style={[styles.micro, { color: colors.accent }]}>Yday</AppText> : null}
-              {note ? (
-                <AppText style={[styles.micro, { color: day.isHoliday ? colors.holiday : day.isOnLeave ? colors.info : colors.muted }]} numberOfLines={1}>
-                  {note}
-                </AppText>
-              ) : null}
-              {day.totalMinutes > 0 ? <AppText style={[styles.micro, { color: colors.accent }]}>{formatHours(day.totalMinutes)}h</AppText> : null}
-            </Pressable>
-          )
-        })}
+                      ? colors.card
+                      : colors.canvas
+            const caption = isToday
+              ? 'Today'
+              : isYesterday && editable
+                ? 'Yday'
+                : day.isHoliday
+                  ? 'Holiday'
+                  : day.isOnLeave
+                    ? 'Leave'
+                    : day.isWeekend
+                      ? 'Weekend'
+                      : day.isFuture
+                        ? 'Future'
+                        : older
+                          ? 'Locked'
+                          : editable
+                            ? day.entryCount > 0
+                              ? 'Edit'
+                              : 'Add'
+                            : null
+            const captionColor = isToday || (isYesterday && editable)
+              ? colors.accent
+              : day.isHoliday
+                ? colors.holiday
+                : day.isOnLeave
+                  ? colors.info
+                  : colors.muted
+            const hours = day.totalMinutes > 0 ? `${formatHours(day.totalMinutes)}h` : null
+            return (
+              <Pressable
+                key={day.date}
+                accessibilityState={{ disabled: !editable }}
+                accessibilityLabel={day.date}
+                onPress={() => onSelect(day)}
+                style={[
+                  styles.cell,
+                  {
+                    width: cellWidth,
+                    height: CELL_HEIGHT,
+                    backgroundColor: isToday ? colors.accentSoft : background,
+                    borderColor: isToday || (editable && isYesterday) ? colors.accent : colors.line,
+                    borderWidth: isToday ? 2 : 1,
+                    opacity: day.isFuture ? 0.4 : !editable && !isToday ? 0.72 : 1,
+                  },
+                ]}
+              >
+                <AppText style={[styles.dayNumber, { color: isToday ? colors.accent : colors.ink }]}>{Number(day.date.slice(8))}</AppText>
+                <View style={styles.captionBlock}>
+                  {caption ? (
+                    <AppText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.micro, { color: captionColor }]}>
+                      {caption}
+                    </AppText>
+                  ) : null}
+                  {hours ? (
+                    <AppText numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.micro, { color: colors.accent }]}>
+                      {hours}
+                    </AppText>
+                  ) : null}
+                </View>
+              </Pressable>
+            )
+          })}
+        </View>
       </View>
       <View style={styles.legend}>
         <Legend swatch={colors.accentSoft} label="Today" />
@@ -151,12 +180,22 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 4 },
   nav: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 8, paddingHorizontal: 4 },
   navButton: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  weekdays: { flexDirection: 'row', marginTop: 4 },
-  weekday: { textAlign: 'center', fontSize: 10 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { borderWidth: 1, borderRadius: 12, margin: 1, padding: 4, justifyContent: 'space-between' },
-  micro: { fontFamily: fonts.semibold, fontSize: 9 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12, paddingHorizontal: 4 },
+  weekdays: { flexDirection: 'row', gap: GAP, marginTop: 4 },
+  weekday: { textAlign: 'center', fontSize: 10, lineHeight: 14, letterSpacing: 0.2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginTop: 4 },
+  cell: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 2,
+    paddingVertical: 5,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  dayNumber: { fontFamily: fonts.semibold, fontSize: 14, lineHeight: 16, textAlign: 'center', includeFontPadding: false },
+  captionBlock: { width: '100%', alignItems: 'center', gap: 1 },
+  micro: { fontFamily: fonts.semibold, fontSize: 9, lineHeight: 11, textAlign: 'center', width: '100%', includeFontPadding: false },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, rowGap: 8, marginTop: 16, paddingHorizontal: 4 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   swatch: { width: 12, height: 12, borderRadius: 4, borderWidth: 1 },
 })

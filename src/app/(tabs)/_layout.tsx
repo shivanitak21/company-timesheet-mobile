@@ -1,7 +1,38 @@
 import { Ionicons } from '@expo/vector-icons'
 import { Tabs } from 'expo-router'
+import { Text, useWindowDimensions, type ColorValue } from 'react-native'
 import { fonts } from '@/theme/colors'
 import { useTheme } from '@/theme/ThemeProvider'
+
+const ICON_SIZE = 22
+
+function tabIcon(name: keyof typeof Ionicons.glyphMap) {
+  return ({ color }: { color: ColorValue }) => <Ionicons name={name} color={color} size={ICON_SIZE} />
+}
+
+function TabLabel({ color, children }: { color: ColorValue; children: string }) {
+  const { width } = useWindowDimensions()
+  const labelWidth = Math.floor(width / 5) - 6
+  return (
+    <Text
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.72}
+      allowFontScaling={false}
+      style={{
+        color,
+        width: labelWidth,
+        textAlign: 'center',
+        fontFamily: fonts.semibold,
+        fontSize: 11,
+        lineHeight: 13,
+        includeFontPadding: false,
+      }}
+    >
+      {children}
+    </Text>
+  )
+}
 
 export default function TabLayout() {
   const { colors } = useTheme()
@@ -15,7 +46,9 @@ export default function TabLayout() {
           backgroundColor: colors.card,
           borderTopColor: colors.line,
         },
-        tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11 },
+        tabBarItemStyle: { minWidth: 0, paddingHorizontal: 2 },
+        tabBarIconStyle: { marginBottom: -2 },
+        tabBarLabel: ({ color, children }) => <TabLabel color={color}>{String(children)}</TabLabel>,
         tabBarHideOnKeyboard: true,
       }}
     >
@@ -23,35 +56,35 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+          tabBarIcon: tabIcon('home-outline'),
         }}
       />
       <Tabs.Screen
         name="attendance"
         options={{
           title: 'Attendance',
-          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" color={color} size={size} />,
+          tabBarIcon: tabIcon('time-outline'),
         }}
       />
       <Tabs.Screen
         name="timesheet"
         options={{
           title: 'Timesheet',
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
+          tabBarIcon: tabIcon('calendar-outline'),
         }}
       />
       <Tabs.Screen
         name="tasks"
         options={{
           title: 'Tasks',
-          tabBarIcon: ({ color, size }) => <Ionicons name="checkbox-outline" color={color} size={size} />,
+          tabBarIcon: tabIcon('checkbox-outline'),
         }}
       />
       <Tabs.Screen
         name="leaves"
         options={{
           title: 'Leave',
-          tabBarIcon: ({ color, size }) => <Ionicons name="airplane-outline" color={color} size={size} />,
+          tabBarIcon: tabIcon('airplane-outline'),
         }}
       />
     </Tabs>

@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { Pressable, ScrollView, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { PunchCard } from '@/components/attendance/PunchCard'
 import { AppText, Badge, Card, ErrorBlock, LoadingBlock, TabScreen } from '@/components/ui/primitives'
@@ -54,13 +54,26 @@ export default function DashboardScreen() {
       </Animated.View>
       {attendance.isError ? <ErrorBlock message="Attendance could not be loaded." onRetry={() => attendance.refetch()} /> : null}
 
-      <ScrollView horizontal nestedScrollEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        <Stat label="Today" value={todayLabel(attendance.data?.data.attendance)} />
-        <Stat label="Month hours" value={`${formatHours(sheet?.monthlyTotalMinutes ?? 0)}h`} hint={statusLabel(sheet?.timesheet?.status)} />
-        <Stat label="Pending days" value={String(missing)} hint="Fillable days with no entry" />
-        <Stat label="Open tasks" value={String(openTasks.length)} hint="Assigned to you" />
-        <Stat label="Leave taken" value={String(leave?.approvedDays ?? 0)} hint={`${leave?.pendingDays ?? 0} pending`} />
-      </ScrollView>
+      <View style={{ gap: 10 }}>
+        {rowsOf(
+          [
+            { label: 'Today', value: todayLabel(attendance.data?.data.attendance) },
+            { label: 'Month hours', value: `${formatHours(sheet?.monthlyTotalMinutes ?? 0)}h`, hint: statusLabel(sheet?.timesheet?.status) },
+            { label: 'Pending days', value: String(missing), hint: 'Fillable days with no entry' },
+            { label: 'Open tasks', value: String(openTasks.length), hint: 'Assigned to you' },
+            { label: 'Leave taken', value: String(leave?.approvedDays ?? 0), hint: `${leave?.pendingDays ?? 0} pending` },
+          ],
+          2,
+        ).map((row) => (
+          <View key={row.map((item) => item.label).join('-')} style={{ flexDirection: 'row', gap: 10 }}>
+            {row.map((item) => (
+              <View key={item.label} style={{ flex: 1 }}>
+                <Stat {...item} wide={row.length === 1} />
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
 
       <Card>
         <AppText variant="eyebrow">Attendance</AppText>
@@ -133,14 +146,46 @@ export default function DashboardScreen() {
   )
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value, hint, wide }: { label: string; value: string; hint?: string; wide?: boolean }) {
+  const eyebrow = (
+    <AppText variant="eyebrow" numberOfLines={1} style={{ letterSpacing: 0.6, fontSize: 10 }}>
+      {label}
+    </AppText>
+  )
+  if (wide) {
+    return (
+      <Card style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          {eyebrow}
+          {hint ? (
+            <AppText variant="muted" style={{ marginTop: 4 }} numberOfLines={1}>
+              {hint}
+            </AppText>
+          ) : null}
+        </View>
+        <AppText variant="title">{value}</AppText>
+      </Card>
+    )
+  }
   return (
-    <Card style={{ width: 148, minHeight: 112 }}>
-      <AppText variant="eyebrow">{label}</AppText>
+    <Card style={{ flex: 1, minHeight: 118 }}>
+      {eyebrow}
       <AppText variant="title" style={{ marginTop: 8 }}>{value}</AppText>
-      {hint ? <AppText variant="muted" style={{ marginTop: 4 }} numberOfLines={2}>{hint}</AppText> : null}
+      {hint ? (
+        <AppText variant="muted" style={{ marginTop: 4 }} numberOfLines={2}>
+          {hint}
+        </AppText>
+      ) : (
+        <View style={{ height: 40, marginTop: 4 }} />
+      )}
     </Card>
   )
+}
+
+function rowsOf<T>(items: T[], size: number) {
+  const rows: T[][] = []
+  for (let index = 0; index < items.length; index += size) rows.push(items.slice(index, index + size))
+  return rows
 }
 
 function todayLabel(record: { workMinutes: number | null; status: string; checkInAt: string } | null | undefined) {
