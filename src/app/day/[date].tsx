@@ -7,7 +7,7 @@ import { errorMessage } from '@/api/client'
 import { EntryEditor } from '@/components/timesheet/EntryEditor'
 import { AppText, Badge, Button, Card, ErrorBlock, LoadingBlock, StackScreen } from '@/components/ui/primitives'
 import { useDaily } from '@/hooks/queries'
-import { formatMinutes, formatWeekday, lockMessage, statusLabel } from '@/lib/format'
+import { dayTapMessage, formatMinutes, formatWeekday, statusLabel } from '@/lib/format'
 import { statusTone } from '@/lib/status'
 import { useToast } from '@/state/ToastProvider'
 
@@ -64,7 +64,9 @@ export default function DailyTimesheetScreen() {
                 <Badge label={statusLabel(sheet?.status)} tone={statusTone(sheet?.status)} />
               </Row>
               <AppText variant="muted">Daily total</AppText>
-              <AppText variant="body">{data.isFillable ? 'This weekday can be edited.' : lockMessage(data.lockReasons)}</AppText>
+              <AppText variant="body">
+                {data.isFillable ? 'Add or edit time for this day.' : dayTapMessage(data)}
+              </AppText>
               {sheet?.status === 'rejected' && sheet.rejectionReason ? <AppText variant="body">{sheet.rejectionReason}</AppText> : null}
             </Card>
             <EntryEditor date={data.date} entries={data.entries} editable={data.isFillable} />

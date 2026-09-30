@@ -1,17 +1,13 @@
 import { Ionicons } from '@expo/vector-icons'
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { AppText, Badge, Card } from '@/components/ui/primitives'
-import { formatHours, monthLabel, statusLabel } from '@/lib/format'
+import { ENTRY_WINDOW_LABEL, formatHours, monthLabel, statusLabel } from '@/lib/format'
 import { statusTone } from '@/lib/status'
 import { fonts } from '@/theme/colors'
 import { useTheme } from '@/theme/ThemeProvider'
 import type { CalendarDay, MonthCalendar } from '@/types/api'
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-function quietLocked(day: CalendarDay) {
-  return (day.isWeekend || day.isHoliday || day.isOnLeave || day.isFuture) && day.entryCount === 0
-}
 
 export function MonthGrid({
   year,
@@ -34,6 +30,11 @@ export function MonthGrid({
 
   return (
     <Card style={{ padding: 12 }}>
+      {data?.entryWindow ? (
+        <View style={[styles.window, { backgroundColor: colors.canvas, borderColor: colors.line }]}>
+          <AppText variant="label">{ENTRY_WINDOW_LABEL}</AppText>
+        </View>
+      ) : null}
       <View style={styles.toolbar}>
         <View style={{ flex: 1 }}>
           <AppText variant="eyebrow">Month</AppText>
@@ -62,43 +63,70 @@ export function MonthGrid({
           <View key={`pad-${index}`} style={{ width: cell, height: cell + 8 }} />
         ))}
         {data?.days.map((day) => {
-          const locked = quietLocked(day)
-          const today = data.today === day.date
+          const isToday = data.entryWindow.today === day.date
+          const isYesterday = data.entryWindow.yesterday === day.date
+          const older = day.lockReasons.includes('entry_window') && !day.isFuture
+          const editable = day.isFillable
           const background = day.isHoliday
             ? colors.holidaySoft
             : day.isOnLeave
               ? colors.infoSoft
-              : day.isWeekend || day.isFuture
-                ? colors.canvas
-                : day.entryCount > 0
-                  ? colors.accentSoft
-                  : colors.card
+              : editable && isYesterday
+                ? colors.accentSoft
+                : day.isWeekend || older
+                  ? colors.canvas
+                  : editable
+                    ? colors.card
+                    : colors.canvas
+          const note = day.isHoliday
+            ? 'Holiday'
+            : day.isOnLeave
+              ? 'Leave'
+              : day.isWeekend
+                ? 'Weekend'
+                : day.isFuture
+                  ? 'Future'
+                  : older
+                    ? 'Locked'
+                    : editable
+                      ? day.entryCount > 0
+                        ? 'Edit'
+                        : 'Add'
+                      : null
           return (
             <Pressable
               key={day.date}
-              disabled={locked}
+              accessibilityState={{ disabled: !editable }}
               accessibilityLabel={day.date}
               onPress={() => onSelect(day)}
               style={[
                 styles.cell,
                 {
                   width: cell,
-                  height: cell + 8,
-                  backgroundColor: background,
-                  borderColor: today ? colors.accent : colors.line,
-                  opacity: locked ? 0.55 : 1,
+                  height: cell + 14,
+                  backgroundColor: isToday ? colors.accentSoft : background,
+                  borderColor: isToday || (editable && isYesterday) ? colors.accent : colors.line,
+                  borderWidth: isToday ? 2 : 1,
+                  opacity: day.isFuture ? 0.4 : !editable && !isToday ? 0.72 : 1,
                 },
               ]}
             >
-              <AppText variant="label" style={{ fontSize: 13 }}>{Number(day.date.slice(8))}</AppText>
-              {day.isHoliday ? <AppText style={[styles.micro, { color: colors.holiday }]} numberOfLines={1}>Hol</AppText> : null}
-              {day.isOnLeave && !day.isHoliday ? <AppText style={[styles.micro, { color: colors.info }]} numberOfLines={1}>Leave</AppText> : null}
+              <AppText variant="label" style={{ fontSize: 13, color: isToday ? colors.accent : colors.ink }}>{Number(day.date.slice(8))}</AppText>
+              {isToday ? <AppText style={[styles.micro, { color: colors.accent }]}>Today</AppText> : null}
+              {isYesterday && editable ? <AppText style={[styles.micro, { color: colors.accent }]}>Yday</AppText> : null}
+              {note ? (
+                <AppText style={[styles.micro, { color: day.isHoliday ? colors.holiday : day.isOnLeave ? colors.info : colors.muted }]} numberOfLines={1}>
+                  {note}
+                </AppText>
+              ) : null}
               {day.totalMinutes > 0 ? <AppText style={[styles.micro, { color: colors.accent }]}>{formatHours(day.totalMinutes)}h</AppText> : null}
             </Pressable>
           )
         })}
       </View>
       <View style={styles.legend}>
+        <Legend swatch={colors.accentSoft} label="Today" />
+        <Legend swatch={colors.canvas} label="Locked" />
         <Legend swatch={colors.canvas} label="Weekend" />
         <Legend swatch={colors.holidaySoft} label="Holiday" />
         <Legend swatch={colors.infoSoft} label="Leave" />
@@ -119,6 +147,7 @@ function Legend({ swatch, label }: { swatch: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  window: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
   toolbar: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 4 },
   nav: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 8, paddingHorizontal: 4 },
   navButton: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
